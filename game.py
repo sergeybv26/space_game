@@ -20,6 +20,14 @@ STATES = {
 }
 
 
+def get_frame_size(text):
+    """Calculate size of multiline text fragment, return pair — number of rows and colums."""
+
+    lines = text.splitlines()
+    rows = len(lines)
+    columns = max([len(line) for line in lines])
+    return rows, columns
+
 def read_controls(canvas):
     """Read keys pressed and returns tuple witl controls state."""
 
@@ -122,13 +130,23 @@ async def animate_spaceship(frames):
 
 async def move_spaceship(canvas):
     rows, columns = canvas.getmaxyx()
-    row_max, column_max = rows - 2, columns - 2
+    row_max, column_max = rows - 1, columns - 1
     row, column = row_max // 2, column_max // 2
 
     while True:
         rows_direction, columns_direction, space_pressed = read_controls(canvas)
         frame = STATES['spaceship_state']
+        frame_rows, frame_columns = get_frame_size(frame)
         row, column = row + rows_direction, column + columns_direction
+
+        if row + frame_rows // 2 >= row_max - 5:
+            row = row_max - frame_rows // 2 - 5
+        elif column + frame_columns // 2 >= column_max - 2:
+            column = column_max - frame_columns // 2 - 3
+        elif row - frame_rows // 2 <= - 3:
+            row = frame_rows // 2 - 3
+        elif column - frame_columns // 2 <= 0:
+            column = frame_columns // 2 + 1
         draw_frame(canvas, row, column, frame)
         previos_frame = frame
         await asyncio.sleep(0)
