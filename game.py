@@ -10,6 +10,45 @@ from environs import Env
 
 TIC_TIMEOUT = 0.1
 STAR_SYMBOLS = ['*', '+', '.', ':']
+SPACE_KEY_CODE = 32
+LEFT_KEY_CODE = 260
+RIGHT_KEY_CODE = 261
+UP_KEY_CODE = 259
+DOWN_KEY_CODE = 258
+STATES = {
+    "spaceship_state": ""
+}
+
+
+def read_controls(canvas):
+    """Read keys pressed and returns tuple witl controls state."""
+
+    rows_direction = columns_direction = 0
+    space_pressed = False
+
+    while True:
+        pressed_key_code = canvas.getch()
+
+        if pressed_key_code == -1:
+            # https://docs.python.org/3/library/curses.html#curses.window.getch
+            break
+
+        if pressed_key_code == UP_KEY_CODE:
+            rows_direction = -1
+
+        if pressed_key_code == DOWN_KEY_CODE:
+            rows_direction = 1
+
+        if pressed_key_code == RIGHT_KEY_CODE:
+            columns_direction = 1
+
+        if pressed_key_code == LEFT_KEY_CODE:
+            columns_direction = -1
+
+        if pressed_key_code == SPACE_KEY_CODE:
+            space_pressed = True
+
+    return rows_direction, columns_direction, space_pressed
 
 def draw_frame(canvas, start_row, start_column, text, negative=False):
     """Draw multiline text fragment on canvas, erase text instead of drawing if negative=True is specified."""
@@ -76,11 +115,24 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
         row += rows_speed
         column += columns_speed
 
-async def animate_spaceship(canvas, row, column, frames):
+async def animate_spaceship(frames):
     for frame in cycle(frames):
-        draw_frame(canvas, row, column, frame)
+        STATES['spaceship_state'] = frame
         await asyncio.sleep(0)
-        draw_frame(canvas, row, column, frame, negative=True)
+
+async def move_spaceship(canvas):
+    rows, columns = canvas.getmaxyx()
+    row_max, column_max = rows - 2, columns - 2
+    row, column = row_max // 2, column_max // 2
+
+    while True:
+        rows_direction, columns_direction, space_pressed = read_controls(canvas)
+        frame = STATES['spaceship_state']
+        row, column = row + rows_direction, column + columns_direction
+        draw_frame(canvas, row, column, frame)
+        previos_frame = frame
+        await asyncio.sleep(0)
+        draw_frame(canvas, row, column, previos_frame, negative=True)
 
 async def blink(canvas, row, column, symbol='*', state=0):
     while True:
@@ -114,15 +166,18 @@ def draw(canvas, frames):
     row_max, column_max = rows - 2, columns - 2
     row_center, column_center = row_max // 2, column_max // 2
     fire_coroutine = fire(canvas, row_center, column_center)
-    spaceship_coroutine = animate_spaceship(canvas, row_center, column_center, frames)
+    spaceship_coroutine = animate_spaceship(frames)
+    move_spaceship_coroutine = move_spaceship(canvas)
 
     coroutines.append(fire_coroutine)
     coroutines.append(spaceship_coroutine)
+    coroutines.append(move_spaceship_coroutine)
     coroutines.extend([blink(canvas, random.randint(2, row_max), random.randint(2, column_max),
                        random.choice(STAR_SYMBOLS), random.randint(0, 3)) for _ in range(star_quantity)])
 
     while True:
         canvas.border()
+        canvas.nodelay(True)
         for coroutine in coroutines.copy():
             try:
                 coroutine.send(None)
