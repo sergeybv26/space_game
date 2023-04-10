@@ -15,12 +15,6 @@ LEFT_KEY_CODE = 260
 RIGHT_KEY_CODE = 261
 UP_KEY_CODE = 259
 DOWN_KEY_CODE = 258
-STAR_DRAW_STATES = {
-    0: (curses.A_DIM, 2),
-    1: (curses.A_NORMAL, 0.3),
-    2: (curses.A_BOLD, 0.5),
-    3: (curses.A_NORMAL, 0.3)
-}
 BORDER_SIZE = 2
 
 
@@ -147,11 +141,21 @@ async def move_spaceship(canvas, frames):
         await asyncio.sleep(0)
         draw_frame(canvas, row, column, current_frame, negative=True)
 
-async def blink(canvas, row, column, symbol='*', state=0):
+async def blink(canvas, row, column, symbol='*', init_delay=0):
+    rendering_modes = [
+        (curses.A_DIM, 2),
+        (curses.A_NORMAL, 0.3),
+        (curses.A_BOLD, 0.5),
+        (curses.A_NORMAL, 0.3)
+    ]
+    canvas.addstr(row, column, symbol, curses.A_DIM)
+    await sleep(2 + init_delay)
+
+    rendering_modes_generator = cycle(rendering_modes)
+
     while True:
-        effect, delay = STAR_DRAW_STATES[state]
+        effect, delay = next(rendering_modes_generator)
         canvas.addstr(row, column, symbol, effect)
-        state = state + 1 if state < 3 else 0
         await sleep(delay)
 
 def draw(canvas, frames):
@@ -168,10 +172,17 @@ def draw(canvas, frames):
 
     coroutines.append(fire_coroutine)
     coroutines.append(move_spaceship_coroutine)
-    coroutines.extend([blink(canvas, random.randint(2, row_max),
-                             random.randint(2, column_max),
-                             random.choice(STAR_SYMBOLS),
-                             random.choice(list(STAR_DRAW_STATES.keys()))) for _ in range(star_quantity)])
+    coroutines.extend(
+        [
+            blink(
+                canvas,
+                random.randint(2, row_max),
+                random.randint(2, column_max),
+                random.choice(STAR_SYMBOLS),
+                random.randint(0, 10)
+            ) for _ in range(star_quantity)
+        ]
+    )
 
     while True:
         for coroutine in coroutines.copy():
